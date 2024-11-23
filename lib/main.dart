@@ -12,7 +12,7 @@ class PokeApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Pokémon Browser',
+      title: 'Pokémon Search',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.red),
         useMaterial3: true,
@@ -112,10 +112,10 @@ class _PokeHomePageState extends State<PokeHomePage> {
   String _getFilterQuery() {
     String filter = '';
     if (_selectedGeneration != null) {
-      filter += '&generation=${_selectedGeneration}';
+      filter += '&generation=$_selectedGeneration';
     }
     if (_selectedType != null) {
-      filter += '&type=${_selectedType}';
+      filter += '&type=$_selectedType';
     }
     return filter;
   }
@@ -148,138 +148,132 @@ class _PokeHomePageState extends State<PokeHomePage> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Pokémon Browser'),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-      ),
-      body: Column(
-        children: [
-          // Filter Section
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                DropdownButton<String>(
-                  value: _selectedGeneration,
-                  hint: const Text('Generation'),
-                  onChanged: (value) {
-                    setState(() {
-                      _selectedGeneration = value;
-                      _pages.clear();
-                      _currentPage = 0;
-                      _fetchPokemon();
-                    });
-                  },
-                  items: _generations.map((gen) {
-                    return DropdownMenuItem(
-                      value: gen,
-                      child: Text('Gen $gen'),
-                    );
-                  }).toList(),
-                ),
-                DropdownButton<String>(
-                  value: _selectedType,
-                  hint: const Text('Type'),
-                  onChanged: (value) {
-                    setState(() {
-                      _selectedType = value;
-                      _pages.clear();
-                      _currentPage = 0;
-                      _fetchPokemon();
-                    });
-                  },
-                  items: _types.map((type) {
-                    return DropdownMenuItem(
-                      value: type,
-                      child: Text(type),
-                    );
-                  }).toList(),
-                ),
-              ],
-            ),
+@override
+Widget build(BuildContext context) {
+  return Scaffold(
+    appBar: AppBar(
+      title: const Text('Pokémon Browser'),
+      backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+    ),
+    body: Column(
+      children: [
+        // Filter Section
+        Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              DropdownButton<String>(
+                value: _selectedGeneration,
+                hint: const Text('Generation'),
+                onChanged: (value) {
+                  setState(() {
+                    _selectedGeneration = value;
+                    _pages.clear();
+                    _currentPage = 0;
+                    _fetchPokemon();
+                  });
+                },
+                items: _generations
+                    .map((gen) => DropdownMenuItem(
+                          value: gen,
+                          child: Text('Gen $gen'),
+                        ))
+                    .toList(),
+              ),
+              DropdownButton<String>(
+                value: _selectedType,
+                hint: const Text('Type'),
+                onChanged: (value) {
+                  setState(() {
+                    _selectedType = value;
+                    _pages.clear();
+                    _currentPage = 0;
+                    _fetchPokemon();
+                  });
+                },
+                items: _types
+                    .map((type) => DropdownMenuItem(
+                          value: type,
+                          child: Text(type),
+                        ))
+                    .toList(),
+              ),
+            ],
           ),
-          // Pokémon Cards and Navigation Arrows
-          Expanded(
-            child: Column(
-              children: [
-                Flexible(
-                  child: _pages.isEmpty && _isLoading
-                      ? const Center(child: CircularProgressIndicator())
-                      : PageView.builder(
-                          controller: _pageController,
-                          onPageChanged: _onPageChanged,
-                          itemBuilder: (context, index) {
-                            if (index >= _pages.length) {
-                              return const Center(
-                                  child: CircularProgressIndicator());
-                            }
+        ),
+        // Pokémon Cards and Navigation
+        Expanded(
+          child: Column(
+            children: [
+              Flexible(
+                child: _pages.isEmpty && _isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : PageView.builder(
+                        controller: _pageController,
+                        onPageChanged: _onPageChanged,
+                        itemBuilder: (context, index) {
+                          if (index >= _pages.length) {
+                            return const Center(
+                                child: CircularProgressIndicator());
+                          }
 
-                            final List<Map<String, dynamic>> pagePokemon =
-                                _pages[index];
+                          final pagePokemon = _pages[index];
 
-                            return GridView.builder(
-                              gridDelegate:
-                                  const SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: 5,
-                                childAspectRatio: 1,
-                                crossAxisSpacing: 8,
-                                mainAxisSpacing: 8,
-                              ),
-                              itemCount: pagePokemon.length,
-                              itemBuilder: (context, idx) {
-                                final pokemon = pagePokemon[idx];
-                                return Card(
-                                  elevation: 2,
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Text(
-                                        pokemon['name']
-                                            .toString()
-                                            .toUpperCase(),
-                                        textAlign: TextAlign.center,
-                                        style: const TextStyle(
-                                            fontWeight: FontWeight.bold),
-                                      ),
-                                    ],
+                          return GridView.builder(
+                            gridDelegate:
+                                const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 5,
+                              childAspectRatio: 1,
+                              crossAxisSpacing: 8,
+                              mainAxisSpacing: 8,
+                            ),
+                            itemCount: pagePokemon.length,
+                            itemBuilder: (context, idx) {
+                              final pokemon = pagePokemon[idx];
+                              return Card(
+                                elevation: 2,
+                                child: Center(
+                                  child: Text(
+                                    pokemon['name'].toString().toUpperCase(),
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.bold),
                                   ),
-                                );
-                              },
-                            );
-                          },
-                        ),
-                ),
-                // Navigation Arrows
-                Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      IconButton(
-                        onPressed: _currentPage > 0 ? _goToPreviousPage : null,
-                        icon: const Icon(Icons.arrow_back),
+                                ),
+                              );
+                            },
+                          );
+                        },
                       ),
-                      Text('Page ${_currentPage + 1}'),
-                      IconButton(
-                        onPressed: _currentPage < _pages.length - 1
-                            ? _goToNextPage
-                            : null,
-                        icon: const Icon(Icons.arrow_forward),
-                      ),
-                    ],
-                  ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    IconButton(
+                      onPressed: _currentPage > 0 ? _goToPreviousPage : null,
+                      icon: const Icon(Icons.arrow_back),
+                    ),
+                    Text('Page ${_currentPage + 1}'),
+                    IconButton(
+                      onPressed: _currentPage < _pages.length - 1
+                          ? _goToNextPage
+                          : null,
+                      icon: const Icon(Icons.arrow_forward),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
-      ),
-    );
-  }
+        ),
+      ],
+    ),
+  );
+}
+
 
   @override
   void dispose() {
