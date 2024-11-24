@@ -30,44 +30,88 @@ class PokeHomePage extends StatefulWidget {
 }
 
 class _PokeHomePageState extends State<PokeHomePage> {
-  final int _pages = 5; // Total pages
-  final PageController _pageController = PageController();
-  final int _limit = 20; // Pokémon per page
-
-  int _currentPage = 0;
   bool _isLoading = false;
-  List<List<Map<String, dynamic>>> _pokemonPages = List.filled(5, []);
+  List<Map<String, dynamic>> _pokemonList = [];
+
+  String? _selectedType;
+
+  final List<String> _types = [
+    'normal',
+    'fire',
+    'water',
+    'grass',
+    'electric',
+    'ice',
+    'fighting',
+    'poison',
+    'ground',
+    'flying',
+    'psychic',
+    'bug',
+    'rock',
+    'ghost',
+    'dragon',
+    'dark',
+    'steel',
+    'fairy',
+  ];
 
   @override
   void initState() {
     super.initState();
-    _fetchPokemon(page: 0); // Fetch first page initially
+    _fetchPokemon(); // Initial fetch
   }
 
-  Future<void> _fetchPokemon({required int page}) async {
-    if (_isLoading || _pokemonPages[page].isNotEmpty) return;
-
+  Future<void> _fetchPokemon() async {
     setState(() {
       _isLoading = true;
+      _pokemonList = []; // Clear the list before fetching
     });
 
     try {
-      final int offset = page * _limit;
-      final url =
-          'https://pokeapi.co/api/v2/pokemon/?limit=$_limit&offset=$offset';
+      String url = 'https://pokeapi.co/api/v2/pokemon/?limit=100';
+
+      // Adjust URL based on filters
+      if (_selectedType != null) {
+        url = 'https://pokeapi.co/api/v2/type/${_selectedType}';
+      }
+
       final response = await http.get(Uri.parse(url));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        final List<Map<String, dynamic>> newPokemon = (data['results'] as List)
-            .map((poke) => {
-                  'name': poke['name'],
-                  'url': poke['url'],
-                })
-            .toList();
+
+        List<Map<String, dynamic>> basePokemon;
+        if (_selectedType != null) {
+          basePokemon = (data['pokemon'] as List)
+              .map((pokeData) => {
+                    'name': pokeData['pokemon']['name'],
+                    'url': pokeData['pokemon']['url'],
+                  })
+              .take(100)
+              .toList();
+        } else {
+          basePokemon = (data['results'] as List)
+              .map((poke) => {
+                    'name': poke['name'],
+                    'url': poke['url'],
+                  })
+              .toList();
+        }
+
+        // Fetch detailed Pokémon info
+        final detailedPokemon = await Future.wait(
+          basePokemon.map((poke) async {
+            final details = await _fetchPokemonDetails(poke['url']);
+            return {
+              'name': poke['name'],
+              ...details,
+            };
+          }),
+        );
 
         setState(() {
-          _pokemonPages[page] = newPokemon;
+          _pokemonList = detailedPokemon;
         });
       }
     } catch (error) {
@@ -79,29 +123,27 @@ class _PokeHomePageState extends State<PokeHomePage> {
     }
   }
 
-  void _onPageChanged(int page) {
-    setState(() {
-      _currentPage = page;
-    });
-    _fetchPokemon(page: page);
+  Future<Map<String, dynamic>> _fetchPokemonDetails(String url) async {
+    try {
+      final response = await http.get(Uri.parse(url));
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return {
+          'id': data['id'],
+          'image': data['sprites']['front_default'],
+          'types': (data['types'] as List)
+              .map((typeData) => typeData['type']['name'])
+              .toList(),
+        };
+      }
+    } catch (error) {
+      print('Error fetching Pokémon details: $error');
+    }
+    return {};
   }
 
-  void _goToPreviousPage() {
-    if (_currentPage > 0) {
-      _pageController.previousPage(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-      );
-    }
-  }
-
-  void _goToNextPage() {
-    if (_currentPage < _pages - 1) {
-      _pageController.nextPage(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-      );
-    }
+  void _onFilterChanged() {
+    _fetchPokemon(); // Fetch Pokémon with the new filter
   }
 
   @override
@@ -113,68 +155,77 @@ class _PokeHomePageState extends State<PokeHomePage> {
       ),
       body: Column(
         children: [
-          Expanded(
-            child: PageView.builder(
-              controller: _pageController,
-              onPageChanged: _onPageChanged,
-              itemCount: _pages,
-              itemBuilder: (context, index) {
-                final pagePokemon = _pokemonPages[index];
-
-                if (pagePokemon.isEmpty) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-
-                return GridView.builder(
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 5,
-                    childAspectRatio: 1,
-                    crossAxisSpacing: 8,
-                    mainAxisSpacing: 8,
-                  ),
-                  itemCount: pagePokemon.length,
-                  itemBuilder: (context, idx) {
-                    final pokemon = pagePokemon[idx];
-                    return Card(
-                      elevation: 2,
-                      child: Center(
-                        child: Text(
-                          pokemon['name'].toString().toUpperCase(),
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                    );
-                  },
-                );
-              },
-            ),
-          ),
+          // Filter Section
           Padding(
             padding: const EdgeInsets.all(8.0),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                IconButton(
-                  onPressed: _currentPage > 0 ? _goToPreviousPage : null,
-                  icon: const Icon(Icons.arrow_back),
-                ),
-                Text('Page ${_currentPage + 1} / $_pages'),
-                IconButton(
-                  onPressed: _currentPage < _pages - 1 ? _goToNextPage : null,
-                  icon: const Icon(Icons.arrow_forward),
+                DropdownButton<String>(
+                  value: _selectedType,
+                  hint: const Text('Type'),
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedType = value;
+                    });
+                    _onFilterChanged();
+                  },
+                  items: _types
+                      .map((type) => DropdownMenuItem(
+                            value: type,
+                            child: Text(type),
+                          ))
+                      .toList(),
                 ),
               ],
             ),
           ),
+          // Pokémon Cards Section
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _pokemonList.isEmpty
+                    ? const Center(child: Text('No Pokémon found.'))
+                    : GridView.builder(
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 5,
+                          childAspectRatio: 1,
+                          crossAxisSpacing: 8,
+                          mainAxisSpacing: 8,
+                        ),
+                        itemCount: _pokemonList.length,
+                        itemBuilder: (context, index) {
+                          final pokemon = _pokemonList[index];
+                          return Card(
+                            elevation: 2,
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                pokemon['image'] != null
+                                    ? Image.network(
+                                        pokemon['image'],
+                                        height: 50,
+                                        width: 50,
+                                      )
+                                    : const Icon(Icons.image_not_supported),
+                                Text(
+                                  pokemon['name'].toString().toUpperCase(),
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                Text('ID: ${pokemon['id']}'),
+                                Text('Type(s): ${pokemon['types'].join(', ')}'),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+          ),
         ],
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    _pageController.dispose();
-    super.dispose();
   }
 }
