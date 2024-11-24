@@ -12,7 +12,7 @@ class PokeApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Pokémon Search',
+      title: 'Pokémon Browser',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.red),
         useMaterial3: true,
@@ -32,6 +32,8 @@ class PokeHomePage extends StatefulWidget {
 class _PokeHomePageState extends State<PokeHomePage> {
   bool _isLoading = false;
   List<Map<String, dynamic>> _pokemonList = [];
+  int _offset = 0; // Pagination offset
+  final _limit = 30;
 
   String? _selectedType;
 
@@ -65,13 +67,12 @@ class _PokeHomePageState extends State<PokeHomePage> {
   Future<void> _fetchPokemon() async {
     setState(() {
       _isLoading = true;
-      _pokemonList = []; // Clear the list before fetching
+      _pokemonList = [];
     });
 
     try {
-      String url = 'https://pokeapi.co/api/v2/pokemon/?limit=100';
+      String url = 'https://pokeapi.co/api/v2/pokemon/?offset=$_offset&limit=$_limit';
 
-      // Adjust URL based on filters
       if (_selectedType != null) {
         url = 'https://pokeapi.co/api/v2/type/${_selectedType}';
       }
@@ -88,7 +89,8 @@ class _PokeHomePageState extends State<PokeHomePage> {
                     'name': pokeData['pokemon']['name'],
                     'url': pokeData['pokemon']['url'],
                   })
-              .take(100)
+              .skip(_offset) // Skip based on offset for filtered data
+              .take(_limit)
               .toList();
         } else {
           basePokemon = (data['results'] as List)
@@ -99,7 +101,6 @@ class _PokeHomePageState extends State<PokeHomePage> {
               .toList();
         }
 
-        // Fetch detailed Pokémon info
         final detailedPokemon = await Future.wait(
           basePokemon.map((poke) async {
             final details = await _fetchPokemonDetails(poke['url']);
@@ -142,8 +143,28 @@ class _PokeHomePageState extends State<PokeHomePage> {
     return {};
   }
 
-  void _onFilterChanged() {
-    _fetchPokemon(); // Fetch Pokémon with the new filter
+  void _nextPage() {
+    setState(() {
+      _offset += _limit;
+    });
+    _fetchPokemon();
+  }
+
+  void _previousPage() {
+    if (_offset > 0) {
+      setState(() {
+        _offset -= _limit;
+      });
+      _fetchPokemon();
+    }
+  }
+
+  void _onFilterChanged(String? type) {
+    setState(() {
+      _selectedType = type;
+      _offset = 0; // Reset offset when filter changes
+    });
+    _fetchPokemon();
   }
 
   @override
@@ -165,10 +186,7 @@ class _PokeHomePageState extends State<PokeHomePage> {
                   value: _selectedType,
                   hint: const Text('Type'),
                   onChanged: (value) {
-                    setState(() {
-                      _selectedType = value;
-                    });
-                    _onFilterChanged();
+                    _onFilterChanged(value);
                   },
                   items: _types
                       .map((type) => DropdownMenuItem(
@@ -223,6 +241,23 @@ class _PokeHomePageState extends State<PokeHomePage> {
                           );
                         },
                       ),
+          ),
+          // Pagination Controls
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                ElevatedButton(
+                  onPressed: _offset == 0 ? null : _previousPage,
+                  child: const Text('Previous'),
+                ),
+                ElevatedButton(
+                  onPressed: _pokemonList.isEmpty ? null : _nextPage,
+                  child: const Text('Next'),
+                ),
+              ],
+            ),
           ),
         ],
       ),
