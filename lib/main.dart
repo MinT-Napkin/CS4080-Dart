@@ -32,8 +32,8 @@ class PokeHomePage extends StatefulWidget {
 class _PokeHomePageState extends State<PokeHomePage> {
   bool _isLoading = false;
   List<Map<String, dynamic>> _pokemonList = [];
-  int _offset = 0; // Pagination offset
-  final _limit = 30;
+  int _offset = 0; // pages
+  final _pokemonPerPageLimit = 30;
 
   String? _selectedType;
 
@@ -61,7 +61,7 @@ class _PokeHomePageState extends State<PokeHomePage> {
   @override
   void initState() {
     super.initState();
-    _fetchPokemon(); // Initial fetch
+    _fetchPokemon(); 
   }
 
   Future<void> _fetchPokemon() async {
@@ -71,7 +71,7 @@ class _PokeHomePageState extends State<PokeHomePage> {
     });
 
     try {
-      String url = 'https://pokeapi.co/api/v2/pokemon/?offset=$_offset&limit=$_limit';
+      String url = 'https://pokeapi.co/api/v2/pokemon/?offset=$_offset&limit=$_pokemonPerPageLimit';
 
       if (_selectedType != null) {
         url = 'https://pokeapi.co/api/v2/type/${_selectedType}';
@@ -89,8 +89,8 @@ class _PokeHomePageState extends State<PokeHomePage> {
                     'name': pokeData['pokemon']['name'],
                     'url': pokeData['pokemon']['url'],
                   })
-              .skip(_offset) // Skip based on offset for filtered data
-              .take(_limit)
+              .skip(_offset)
+              .take(_pokemonPerPageLimit)
               .toList();
         } else {
           basePokemon = (data['results'] as List)
@@ -145,7 +145,7 @@ class _PokeHomePageState extends State<PokeHomePage> {
 
   void _nextPage() {
     setState(() {
-      _offset += _limit;
+      _offset += _pokemonPerPageLimit;
     });
     _fetchPokemon();
   }
@@ -153,7 +153,7 @@ class _PokeHomePageState extends State<PokeHomePage> {
   void _previousPage() {
     if (_offset > 0) {
       setState(() {
-        _offset -= _limit;
+        _offset -= _pokemonPerPageLimit;
       });
       _fetchPokemon();
     }
@@ -162,7 +162,7 @@ class _PokeHomePageState extends State<PokeHomePage> {
   void _onFilterChanged(String? type) {
     setState(() {
       _selectedType = type;
-      _offset = 0; // Reset offset when filter changes
+      _offset = 0; // return to page 1
     });
     _fetchPokemon();
   }
