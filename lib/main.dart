@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
+const _pokemonPerPageLimit = 100;
+
 void main() {
   runApp(const PokeApp());
 }
@@ -29,15 +31,25 @@ class PokeHomePage extends StatefulWidget {
   State<PokeHomePage> createState() => _PokeHomePageState();
 }
 
-class _PokeHomePageState extends State<PokeHomePage> {
+mixin PageHandler {
+  int _offset = 0;
+
+  void _nextPage();
+  void _previousPage();
+
+  void printCurrentPage(){
+    print('Page #: ${(_offset/100)+1}');
+  }
+}
+
+class _PokeHomePageState extends State<PokeHomePage> with PageHandler {
   bool _isLoading = false;
   List<Map<String, dynamic>> _pokemonList = [];
-  int _offset = 0; // pages
-  final _pokemonPerPageLimit = 30;
 
   String? _selectedType;
 
   final List<String> _types = [
+    'no filter',
     'normal',
     'fire',
     'water',
@@ -61,20 +73,24 @@ class _PokeHomePageState extends State<PokeHomePage> {
   @override
   void initState() {
     super.initState();
-    _fetchPokemon(); 
+    _fetchPokemon(type: _selectedType); 
   }
 
-  Future<void> _fetchPokemon() async {
+  Future<void> _fetchPokemon({
+    int offset = 0,
+    int limit = _pokemonPerPageLimit,
+    required String? type,
+  }) async {
     setState(() {
       _isLoading = true;
       _pokemonList = [];
     });
 
     try {
-      String url = 'https://pokeapi.co/api/v2/pokemon/?offset=$_offset&limit=$_pokemonPerPageLimit';
+      String url = 'https://pokeapi.co/api/v2/pokemon/?offset=$offset&limit=$limit';
 
-      if (_selectedType != null) {
-        url = 'https://pokeapi.co/api/v2/type/${_selectedType}';
+      if (type != null) {
+        url = 'https://pokeapi.co/api/v2/type/$type';
       }
 
       final response = await http.get(Uri.parse(url));
@@ -83,14 +99,12 @@ class _PokeHomePageState extends State<PokeHomePage> {
         final data = json.decode(response.body);
 
         List<Map<String, dynamic>> basePokemon;
-        if (_selectedType != null) {
+        if (type != null) {
           basePokemon = (data['pokemon'] as List)
               .map((pokeData) => {
                     'name': pokeData['pokemon']['name'],
                     'url': pokeData['pokemon']['url'],
                   })
-              .skip(_offset)
-              .take(_pokemonPerPageLimit)
               .toList();
         } else {
           basePokemon = (data['results'] as List)
@@ -143,28 +157,43 @@ class _PokeHomePageState extends State<PokeHomePage> {
     return {};
   }
 
+  @override
   void _nextPage() {
     setState(() {
       _offset += _pokemonPerPageLimit;
     });
-    _fetchPokemon();
+    _fetchPokemon(offset: _offset, type: _selectedType);
+    printCurrentPage();
   }
 
+  @override
   void _previousPage() {
     if (_offset > 0) {
       setState(() {
         _offset -= _pokemonPerPageLimit;
       });
-      _fetchPokemon();
+      _fetchPokemon(type: _selectedType, offset: _offset);
     }
+    printCurrentPage();
   }
 
-  void _onFilterChanged(String? type) {
+  void _onFilterChanged(String? type, [String message = "NO FILTER selected"]) {
     setState(() {
-      _selectedType = type;
+
+      if(type == 'no filter')
+      {
+        _selectedType = null;
+        print(message);
+      }
+      else
+      {
+        _selectedType = type;
+        print(message);
+      }
+
       _offset = 0; // return to page 1
     });
-    _fetchPokemon();
+    _fetchPokemon(offset: _offset, type: _selectedType);
   }
 
   @override
@@ -186,7 +215,14 @@ class _PokeHomePageState extends State<PokeHomePage> {
                   value: _selectedType,
                   hint: const Text('Type'),
                   onChanged: (value) {
-                    _onFilterChanged(value);
+                    if(value == 'no filter')
+                    {
+                      _onFilterChanged(value);
+                    }
+                    else
+                    {
+                      _onFilterChanged(value, "$value filter selected");
+                    }
                   },
                   items: _types
                       .map((type) => DropdownMenuItem(
@@ -253,7 +289,7 @@ class _PokeHomePageState extends State<PokeHomePage> {
                   child: const Text('Previous'),
                 ),
                 ElevatedButton(
-                  onPressed: _pokemonList.isEmpty ? null : _nextPage,
+                  onPressed: (_pokemonList.isEmpty || _selectedType!=null) ? null : _nextPage,
                   child: const Text('Next'),
                 ),
               ],
